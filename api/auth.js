@@ -1,4 +1,14 @@
-import { kv } from '@vercel/kv'
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function redisSetEx(key, value, ex) {
+  const res = await fetch(`${UPSTASH_URL}/setex/${key}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value, ex })
+  });
+  return res.ok;
+}
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -13,7 +23,7 @@ export default async function handler(req, res) {
 
     if (users[username] === password) {
       const token = Math.random().toString(36)
-      await kv.set(`session:${token}`, username, { ex: 3600 }) // 1 hour
+      await redisSetEx(`session:${token}`, username, 3600) // 1 hour
       res.status(200).json({ token })
     } else {
       res.status(401).json({ error: 'Invalid credentials' })

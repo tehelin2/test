@@ -32,14 +32,16 @@ git push -u origin main
 
 ## Vercel Backend (Kalenteri)
 
-Kalenteri käyttää Vercel Functions ja KV-tallennusta jaetulle kalenterille. Aseta seuraavasti:
+Kalenteri käyttää Vercel Functions ja Upstash Redis -tallennusta jaetulle kalenterille. Aseta seuraavasti:
 
-1. Asenna Vercel CLI: `npm install -g vercel`
-2. Kirjaudu: `vercel login`
-3. Linkitä projekti: `vercel link` (valitse GitHub-repo)
-4. Ota KV käyttöön: `vercel kv enable`
-5. Deploy: `vercel --prod`
-6. Sivusi on käytettävissä Vercel-URL:ssä.
+1. Luo Upstash-tili: https://console.upstash.com/
+2. Luo uusi Redis-database (free tier)
+3. Kopioi REST URL ja REST Token
+4. Mene Vercel-projektiin: Settings → Environment Variables
+5. Lisää muuttujat:
+   - `UPSTASH_REDIS_REST_URL` = sinun REST URL
+   - `UPSTASH_REDIS_REST_TOKEN` = sinun REST Token
+6. Deploy: `vercel --prod` tai pushaa GitHubiin
 
 ### Kirjautuminen
 - Käyttäjänimet: Emilia, Tuomas, Mauno, Leevi

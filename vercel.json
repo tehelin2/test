@@ -3,6 +3,5 @@
     "api/**/*.js": {
       "runtime": "@vercel/node"
     }
-  },
-  "kv": true
+  }
 }
