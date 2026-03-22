@@ -12,11 +12,26 @@ async function redisGet(key) {
 async function redisSet(key, value) {
   const res = await fetch(`${UPSTASH_URL}/set/${key}`, {
     method: 'POST',
+    headers: { 
+      Authorization: `Bearer ${UPSTASH_TOKEN}` 
+      // Emme tarvitse Content-Type: application/json, 
+      // koska lähetämme arvon suoraan stringinä
+    },
+    body: JSON.stringify(value) // Tämä tallentaa koko taulukon yhtenä stringinä
+  });
+  return res.ok;
+}
+/*
+async function redisSet(key, value) {
+  const res = await fetch(`${UPSTASH_URL}/set/${key}`, {
+    method: 'POST',
     headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: JSON.stringify(value) })
   });
   return res.ok;
 }
+
+*/
 
 export default async function handler(req, res) {
   const { id } = req.query
