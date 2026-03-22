@@ -5,6 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Perheen Kotisivu</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        // Firebase config - TÄYTÄ TÄMÄ Firebase-konsolista!
+        const firebaseConfig = {
+            apiKey: "AIzaSyAL3QFZlR113zzcb5CqzjiZy4136VEf9UA",
+            authDomain: "perhe-helin.firebaseapp.com",
+            projectId: "perhe-helin",
+            storageBucket: "perhe-helin.firebasestorage.app",
+            messagingSenderId: "26604990777",
+            appId: "1:26604990777:web:453f9cced17cea0b11f8e8",
+            measurementId: "G-XBXJBET7FN"
+    };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.firebaseDB = db;
+        window.addDoc = addDoc;
+        window.onSnapshot = onSnapshot;
+        window.deleteDoc = deleteDoc;
+        window.doc = doc;
+        window.collection = collection;
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
         
@@ -471,30 +498,24 @@
     </footer>
 
     <script>
-        const STORAGE_KEY = 'familyCalendarEvents';
         const form = document.getElementById('family-calendar-form');
         const listEl = document.getElementById('family-calendar-list');
         const messageEl = document.getElementById('event-message');
         const clearBtn = document.getElementById('clear-events-btn');
 
-        let events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-
         function formatDate(dateString) {
             return new Date(dateString).toLocaleDateString('fi-FI', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
         }
 
-        function saveEvents() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-        }
-
-        function renderEvents() {
+        function renderEvents(snapshot) {
+            const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             if (!events.length) {
                 listEl.innerHTML = '<p class="text-gray-500 md:col-span-2">Ei vielä tapahtumia. Lisää uusi tapahtuma yllä olevalla lomakkeella.</p>';
                 return;
             }
 
-            const sorted = [...events].sort((a, b) => new Date(a.date) - new Date(b.date));
-            listEl.innerHTML = sorted.map((event, idx) => `
+            const sorted = events.sort((a, b) => new Date(a.date) - new Date(b.date));
+            listEl.innerHTML = sorted.map(event => `
                 <article class="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
                     <div class="flex justify-between items-start gap-4">
                         <div>
@@ -502,24 +523,27 @@
                             <h5 class="text-lg font-bold text-gray-800">${event.title}</h5>
                             <p class="text-sm text-gray-500">${formatDate(event.date)}</p>
                         </div>
-                        <button data-index="${idx}" class="delete-event-btn text-sm text-red-500 hover:text-red-600">Poista</button>
+                        <button data-id="${event.id}" class="delete-event-btn text-sm text-red-500 hover:text-red-600">Poista</button>
                     </div>
                     <p class="mt-2 text-gray-600 text-sm">${event.description || 'Ei lisäkuvausta'}</p>
                 </article>
             `).join('');
 
             document.querySelectorAll('.delete-event-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const index = Number(btn.dataset.index);
-                    events.splice(index, 1);
-                    saveEvents();
-                    renderEvents();
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    await deleteDoc(doc(window.firebaseDB, 'events', id));
                     messageEl.innerText = 'Tapahtuma poistettu.';
                 });
             });
         }
 
-        form.addEventListener('submit', event => {
+        // Real-time listener
+        onSnapshot(collection(window.firebaseDB, 'events'), (snapshot) => {
+            renderEvents(snapshot);
+        });
+
+        form.addEventListener('submit', async event => {
             event.preventDefault();
             const member = document.getElementById('member').value.trim();
             const date = document.getElementById('date').value;
@@ -531,24 +555,18 @@
                 return;
             }
 
-            events.push({ member, date, title, description });
-            saveEvents();
-            renderEvents();
-
-            form.reset();
-            messageEl.innerText = 'Tapahtuma lisätty, hyvä juttu!';
-        });
-
-        clearBtn.addEventListener('click', () => {
-            if (confirm('Haluatko varmasti poistaa kaikki lisätyt tapahtumat?')) {
-                events = [];
-                saveEvents();
-                renderEvents();
-                messageEl.innerText = 'Kaikki tapahtumat poistettu.';
+            try {
+                await addDoc(collection(window.firebaseDB, 'events'), { member, date, title, description });
+                form.reset();
+                messageEl.innerText = 'Tapahtuma lisätty, hyvä juttu!';
+            } catch (error) {
+                messageEl.innerText = 'Virhe tapahtuman lisäämisessä: ' + error.message;
             }
         });
 
-        renderEvents();
+        clearBtn.addEventListener('click', () => {
+            messageEl.innerText = 'Tyhjennys ei ole käytössä jaetussa kalenterissa. Poista tapahtumat yksitellen.';
+        });
     </script>
 </body>
 </html>
