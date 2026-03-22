@@ -1,11 +1,26 @@
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
+
+/*
 async function redisSetEx(key, value, ex) {
   const res = await fetch(`${UPSTASH_URL}/setex/${key}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ value, ex })
+  });
+  return res.ok;
+}
+*/
+
+async function redisSetEx(key, value, ex) {
+  // Upstash REST API:ssa syntaksi on /setex/key/seconds/value
+  const res = await fetch(`${UPSTASH_URL}/setex/${key}/${ex}`, {
+    method: 'POST',
+    headers: { 
+      Authorization: `Bearer ${UPSTASH_TOKEN}` 
+    },
+    body: JSON.stringify(value) // Lähetetään vain itse arvo (username)
   });
   return res.ok;
 }
