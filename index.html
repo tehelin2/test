@@ -396,7 +396,32 @@
             </div>
 
             <!-- Dynaaminen Lisää Tapahtuma -->
-            <div class="mt-12 bg-purple-50 rounded-3xl p-8 border-2 border-purple-200 shadow-inner">
+            <div id="login-section" class="mt-12 bg-purple-50 rounded-3xl p-8 border-2 border-purple-200 shadow-inner">
+                <h4 class="text-3xl font-bold text-gray-800 mb-4">Kirjaudu sisään</h4>
+                <p class="text-gray-600 mb-6">Kirjaudu sisään nähdäksesi ja lisätäksesi tapahtumia.</p>
+                <form id="login-form" class="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="username">Käyttäjänimi</label>
+                        <select id="username" required class="w-full rounded-xl border border-purple-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300">
+                            <option value="">Valitse</option>
+                            <option value="Emilia">Emilia</option>
+                            <option value="Tuomas">Tuomas</option>
+                            <option value="Mauno">Mauno</option>
+                            <option value="Leevi">Leevi</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="password">Salasana</label>
+                        <input id="password" type="password" placeholder="Salasana" required class="w-full rounded-xl border border-purple-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-full shadow">Kirjaudu</button>
+                    </div>
+                </form>
+                <div id="login-message" class="mt-6 text-sm text-gray-500"></div>
+            </div>
+
+            <div id="calendar-section" class="mt-12 bg-purple-50 rounded-3xl p-8 border-2 border-purple-200 shadow-inner" style="display: none;">
                 <h4 class="text-3xl font-bold text-gray-800 mb-4">Lisää oma aktiviteetti</h4>
                 <p class="text-gray-600 mb-6">Täytä alla oleva lomake, niin kaikki voivat nähdä ja kommentoida yhteisiä tapahtumia.</p>
                 <form id="family-calendar-form" class="grid gap-4 md:grid-cols-2">
@@ -418,7 +443,7 @@
                     </div>
                     <div class="md:col-span-2 flex items-center gap-4">
                         <button type="submit" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-full shadow">Lisää tapahtuma</button>
-                        <button id="clear-events-btn" type="button" class="bg-white border border-purple-200 hover:bg-purple-100 text-purple-700 font-semibold px-4 py-2 rounded-full">Tyhjennä kaikki</button>
+                        <button id="logout-btn" type="button" class="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-full">Kirjaudu ulos</button>
                     </div>
                 </form>
 
@@ -471,30 +496,88 @@
     </footer>
 
     <script>
-        const STORAGE_KEY = 'familyCalendarEvents';
-        const form = document.getElementById('family-calendar-form');
+        const loginSection = document.getElementById('login-section');
+        const calendarSection = document.getElementById('calendar-section');
+        const loginForm = document.getElementById('login-form');
+        const familyForm = document.getElementById('family-calendar-form');
         const listEl = document.getElementById('family-calendar-list');
-        const messageEl = document.getElementById('event-message');
-        const clearBtn = document.getElementById('clear-events-btn');
+        const eventMessage = document.getElementById('event-message');
+        const loginMessage = document.getElementById('login-message');
+        const logoutBtn = document.getElementById('logout-btn');
 
-        let events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        let token = localStorage.getItem('family-token');
+        let refreshInterval;
 
         function formatDate(dateString) {
             return new Date(dateString).toLocaleDateString('fi-FI', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
         }
 
-        function saveEvents() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+        function showLogin() {
+            loginSection.style.display = 'block';
+            calendarSection.style.display = 'none';
+            if (refreshInterval) clearInterval(refreshInterval);
         }
 
-        function renderEvents() {
+        function showCalendar() {
+            loginSection.style.display = 'none';
+            calendarSection.style.display = 'block';
+            loadEvents();
+            refreshInterval = setInterval(loadEvents, 30000); // Refresh every 30s
+        }
+
+        async function login(username, password) {
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.token;
+                    localStorage.setItem('family-token', token);
+                    localStorage.setItem('last-member', username);
+                    document.getElementById('member').value = username;
+                    showCalendar();
+                } else {
+                    loginMessage.textContent = data.error;
+                }
+            } catch (error) {
+                loginMessage.textContent = 'Virhe kirjautumisessa: ' + error.message;
+            }
+        }
+
+        function logout() {
+            token = null;
+            localStorage.removeItem('family-token');
+            showLogin();
+        }
+
+        async function loadEvents() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/events', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const events = await res.json();
+                if (res.ok) {
+                    renderEvents(events);
+                } else {
+                    if (res.status === 401) logout();
+                }
+            } catch (error) {
+                eventMessage.textContent = 'Virhe tapahtumien lataamisessa: ' + error.message;
+            }
+        }
+
+        function renderEvents(events) {
             if (!events.length) {
                 listEl.innerHTML = '<p class="text-gray-500 md:col-span-2">Ei vielä tapahtumia. Lisää uusi tapahtuma yllä olevalla lomakkeella.</p>';
                 return;
             }
 
-            const sorted = [...events].sort((a, b) => new Date(a.date) - new Date(b.date));
-            listEl.innerHTML = sorted.map((event, idx) => `
+            const sorted = events.sort((a, b) => new Date(a.date) - new Date(b.date));
+            listEl.innerHTML = sorted.map(event => `
                 <article class="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
                     <div class="flex justify-between items-start gap-4">
                         <div>
@@ -502,24 +585,41 @@
                             <h5 class="text-lg font-bold text-gray-800">${event.title}</h5>
                             <p class="text-sm text-gray-500">${formatDate(event.date)}</p>
                         </div>
-                        <button data-index="${idx}" class="delete-event-btn text-sm text-red-500 hover:text-red-600">Poista</button>
+                        <button data-id="${event.id}" class="delete-event-btn text-sm text-red-500 hover:text-red-600">Poista</button>
                     </div>
                     <p class="mt-2 text-gray-600 text-sm">${event.description || 'Ei lisäkuvausta'}</p>
                 </article>
             `).join('');
 
             document.querySelectorAll('.delete-event-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const index = Number(btn.dataset.index);
-                    events.splice(index, 1);
-                    saveEvents();
-                    renderEvents();
-                    messageEl.innerText = 'Tapahtuma poistettu.';
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    try {
+                        const res = await fetch(`/api/events/${id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                            eventMessage.textContent = 'Tapahtuma poistettu.';
+                            loadEvents();
+                        } else {
+                            eventMessage.textContent = 'Virhe poistamisessa.';
+                        }
+                    } catch (error) {
+                        eventMessage.textContent = 'Virhe: ' + error.message;
+                    }
                 });
             });
         }
 
-        form.addEventListener('submit', event => {
+        loginForm.addEventListener('submit', event => {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            login(username, password);
+        });
+
+        familyForm.addEventListener('submit', async event => {
             event.preventDefault();
             const member = document.getElementById('member').value.trim();
             const date = document.getElementById('date').value;
@@ -527,28 +627,41 @@
             const description = document.getElementById('description').value.trim();
 
             if (!member || !date || !title) {
-                messageEl.innerText = 'Täytä kaikki pakolliset kentät: perheen jäsen, päivämäärä ja nimi.';
+                eventMessage.textContent = 'Täytä kaikki pakolliset kentät.';
                 return;
             }
 
-            events.push({ member, date, title, description });
-            saveEvents();
-            renderEvents();
-
-            form.reset();
-            messageEl.innerText = 'Tapahtuma lisätty, hyvä juttu!';
-        });
-
-        clearBtn.addEventListener('click', () => {
-            if (confirm('Haluatko varmasti poistaa kaikki lisätyt tapahtumat?')) {
-                events = [];
-                saveEvents();
-                renderEvents();
-                messageEl.innerText = 'Kaikki tapahtumat poistettu.';
+            try {
+                const res = await fetch('/api/events', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ member, date, title, description })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    familyForm.reset();
+                    document.getElementById('member').value = localStorage.getItem('last-member') || '';
+                    eventMessage.textContent = 'Tapahtuma lisätty!';
+                    loadEvents();
+                } else {
+                    eventMessage.textContent = data.error;
+                }
+            } catch (error) {
+                eventMessage.textContent = 'Virhe tapahtuman lisäämisessä: ' + error.message;
             }
         });
 
-        renderEvents();
+        logoutBtn.addEventListener('click', logout);
+
+        // Initialize
+        if (token) {
+            showCalendar();
+        } else {
+            showLogin();
+        }
     </script>
 </body>
 </html>
