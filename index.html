@@ -62,12 +62,13 @@
                         Perhe Helin v 0.4
                     </h1>
                 </div>
-                <div class="hidden md:flex space-x-8">
+                <div class="hidden md:flex items-center space-x-8">
                     <a href="#home" class="text-gray-600 hover:text-purple-500 smooth-transition font-medium">Koti</a>
                     <a href="#family" class="text-gray-600 hover:text-purple-500 smooth-transition font-medium">Perhe</a>
                     <a href="#gallery" class="text-gray-600 hover:text-purple-500 smooth-transition font-medium">Kuvat</a>
                     <a href="#blog" class="text-gray-600 hover:text-purple-500 smooth-transition font-medium">Blogi</a>
                     <a href="#calendar" class="text-gray-600 hover:text-purple-500 smooth-transition font-medium">Tapahtumat</a>
+                    <button id="nav-logout-btn" class="text-gray-600 hover:text-purple-500 smooth-transition font-medium hidden">Kirjaudu ulos</button>
                 </div>
                 <button class="md:hidden bg-purple-100 text-purple-600 px-4 py-2 rounded-full font-medium hover:bg-purple-200 smooth-transition">
                     ☰
@@ -508,6 +509,7 @@
         const eventMessage = document.getElementById('event-message');
         const loginMessage = document.getElementById('login-message');
         const logoutBtn = document.getElementById('logout-btn');
+        const navLogoutBtn = document.getElementById('nav-logout-btn');
 
         let token = localStorage.getItem('family-token');
         let refreshInterval;
@@ -538,12 +540,14 @@
             appContent.style.display = 'none';
             calendarSection.style.display = 'none';
             if (refreshInterval) clearInterval(refreshInterval);
+            if (navLogoutBtn) navLogoutBtn.classList.add('hidden');
         }
 
         function showApp() {
             loginOverlay.style.display = 'none';
             appContent.style.display = 'block';
             calendarSection.style.display = 'block';
+            if (navLogoutBtn) navLogoutBtn.classList.remove('hidden');
             loadEvents();
             refreshInterval = setInterval(loadEvents, 30000); // Refresh every 30s
         }
@@ -767,6 +771,9 @@
             }
         });
 
+        if (navLogoutBtn) {
+            navLogoutBtn.addEventListener('click', logout);
+        }
         logoutBtn.addEventListener('click', logout);
 
         // Initialize
