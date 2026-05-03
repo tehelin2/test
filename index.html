@@ -584,11 +584,9 @@
                     showApp();
                 } else if (!res.ok && data && data.error) {
                     loginMessage.textContent = data.error;
-                } else if (res.ok && !data) {
-                    // API path is not available or returns HTML, fallback to local auth
-                    localLogin(username, password);
                 } else {
-                    loginMessage.textContent = 'Palvelin ei vastannut odotetulla tavalla.';
+                    // If the API path is missing or returns HTML, fallback to local auth
+                    localLogin(username, password);
                 }
             } catch (error) {
                 // Most likely a static server without /api routes
