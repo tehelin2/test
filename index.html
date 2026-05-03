@@ -26,6 +26,33 @@
     </style>
 </head>
 <body class="bg-white">
+    <div id="login-overlay" class="min-h-screen flex items-center justify-center bg-purple-50 px-4 py-12">
+        <div class="w-full max-w-md bg-white rounded-3xl p-8 shadow-xl">
+            <h2 class="text-3xl font-bold text-gray-800 mb-3">Kirjaudu sisään</h2>
+            <p class="text-gray-600 mb-6">Kirjaudu sisään nähdäksesi sivun sisällön.</p>
+            <form id="login-form" class="grid gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="username">Käyttäjänimi</label>
+                    <select id="username" required class="w-full rounded-xl border border-purple-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300">
+                        <option value="">Valitse</option>
+                        <option value="Emilia">Emilia</option>
+                        <option value="Tuomas">Tuomas</option>
+                        <option value="Mauno">Mauno</option>
+                        <option value="Leevi">Leevi</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="password">Salasana</label>
+                    <input id="password" type="password" placeholder="Salasana" required class="w-full rounded-xl border border-purple-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                </div>
+                <div>
+                    <button type="submit" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-full shadow">Kirjaudu</button>
+                </div>
+            </form>
+            <div id="login-message" class="mt-6 text-sm text-gray-500"></div>
+        </div>
+    </div>
+    <div id="app-content" style="display:none;">
     <!-- Navigaatio -->
     <nav class="bg-white shadow-sm sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -396,31 +423,6 @@
             </div>
 
             <!-- Dynaaminen Lisää Tapahtuma -->
-            <div id="login-section" class="mt-12 bg-purple-50 rounded-3xl p-8 border-2 border-purple-200 shadow-inner">
-                <h4 class="text-3xl font-bold text-gray-800 mb-4">Kirjaudu sisään</h4>
-                <p class="text-gray-600 mb-6">Kirjaudu sisään nähdäksesi ja lisätäksesi tapahtumia.</p>
-                <form id="login-form" class="grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="username">Käyttäjänimi</label>
-                        <select id="username" required class="w-full rounded-xl border border-purple-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300">
-                            <option value="">Valitse</option>
-                            <option value="Emilia">Emilia</option>
-                            <option value="Tuomas">Tuomas</option>
-                            <option value="Mauno">Mauno</option>
-                            <option value="Leevi">Leevi</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="password">Salasana</label>
-                        <input id="password" type="password" placeholder="Salasana" required class="w-full rounded-xl border border-purple-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
-                    </div>
-                    <div class="md:col-span-2">
-                        <button type="submit" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold px-6 py-2 rounded-full shadow">Kirjaudu</button>
-                    </div>
-                </form>
-                <div id="login-message" class="mt-6 text-sm text-gray-500"></div>
-            </div>
-
             <div id="calendar-section" class="mt-12 bg-purple-50 rounded-3xl p-8 border-2 border-purple-200 shadow-inner" style="display: none;">
                 <h4 class="text-3xl font-bold text-gray-800 mb-4">Lisää oma aktiviteetti</h4>
                 <p class="text-gray-600 mb-6">Täytä alla oleva lomake, niin kaikki voivat nähdä ja kommentoida yhteisiä tapahtumia.</p>
@@ -494,9 +496,11 @@
             </div>
         </div>
     </footer>
+    </div>
 
     <script>
-        const loginSection = document.getElementById('login-section');
+        const loginOverlay = document.getElementById('login-overlay');
+        const appContent = document.getElementById('app-content');
         const calendarSection = document.getElementById('calendar-section');
         const loginForm = document.getElementById('login-form');
         const familyForm = document.getElementById('family-calendar-form');
@@ -513,13 +517,15 @@
         }
 
         function showLogin() {
-            loginSection.style.display = 'block';
+            loginOverlay.style.display = 'flex';
+            appContent.style.display = 'none';
             calendarSection.style.display = 'none';
             if (refreshInterval) clearInterval(refreshInterval);
         }
 
-        function showCalendar() {
-            loginSection.style.display = 'none';
+        function showApp() {
+            loginOverlay.style.display = 'none';
+            appContent.style.display = 'block';
             calendarSection.style.display = 'block';
             loadEvents();
             refreshInterval = setInterval(loadEvents, 30000); // Refresh every 30s
@@ -538,7 +544,7 @@
                     localStorage.setItem('family-token', token);
                     localStorage.setItem('last-member', username);
                     document.getElementById('member').value = username;
-                    showCalendar();
+                    showApp();
                 } else {
                     loginMessage.textContent = data.error;
                 }
@@ -658,7 +664,7 @@
 
         // Initialize
         if (token) {
-            showCalendar();
+            showApp();
         } else {
             showLogin();
         }
