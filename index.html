@@ -511,9 +511,26 @@
 
         let token = localStorage.getItem('family-token');
         let refreshInterval;
+        let apiAvailable = true;
+
+        const fallbackUsers = {
+            Emilia: 'helin2026',
+            Tuomas: 'helin2026',
+            Mauno: 'helin2026',
+            Leevi: 'helin2026'
+        };
 
         function formatDate(dateString) {
             return new Date(dateString).toLocaleDateString('fi-FI', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        function getLocalEvents() {
+            const saved = localStorage.getItem('family-events');
+            return saved ? JSON.parse(saved) : [];
+        }
+
+        function saveLocalEvents(events) {
+            localStorage.setItem('family-events', JSON.stringify(events));
         }
 
         function showLogin() {
@@ -531,6 +548,18 @@
             refreshInterval = setInterval(loadEvents, 30000); // Refresh every 30s
         }
 
+        function localLogin(username, password) {
+            if (fallbackUsers[username] === password) {
+                token = 'local-auth';
+                localStorage.setItem('family-token', token);
+                localStorage.setItem('last-member', username);
+                document.getElementById('member').value = username;
+                showApp();
+            } else {
+                loginMessage.textContent = 'Väärä käyttäjätunnus tai salasana.';
+            }
+        }
+
         async function login(username, password) {
             try {
                 const res = await fetch('/api/auth', {
@@ -538,18 +567,32 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-                const data = await res.json();
-                if (res.ok) {
+
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = null;
+                }
+
+                if (res.ok && data && data.token) {
                     token = data.token;
                     localStorage.setItem('family-token', token);
                     localStorage.setItem('last-member', username);
                     document.getElementById('member').value = username;
                     showApp();
-                } else {
+                } else if (!res.ok && data && data.error) {
                     loginMessage.textContent = data.error;
+                } else if (res.ok && !data) {
+                    // API path is not available or returns HTML, fallback to local auth
+                    localLogin(username, password);
+                } else {
+                    loginMessage.textContent = 'Palvelin ei vastannut odotetulla tavalla.';
                 }
             } catch (error) {
-                loginMessage.textContent = 'Virhe kirjautumisessa: ' + error.message;
+                // Most likely a static server without /api routes
+                localLogin(username, password);
             }
         }
 
@@ -561,6 +604,11 @@
 
         async function loadEvents() {
             if (!token) return;
+            if (!apiAvailable) {
+                renderEvents(getLocalEvents());
+                return;
+            }
+
             try {
                 const res = await fetch('/api/events', {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -570,9 +618,16 @@
                     renderEvents(events);
                 } else {
                     if (res.status === 401) logout();
+                    else {
+                        apiAvailable = false;
+                        eventMessage.textContent = 'Tapahtumien palvelin ei ole käytettävissä. Näytetään paikallisia tapahtumia.';
+                        renderEvents(getLocalEvents());
+                    }
                 }
             } catch (error) {
-                eventMessage.textContent = 'Virhe tapahtumien lataamisessa: ' + error.message;
+                apiAvailable = false;
+                eventMessage.textContent = 'Palvelin ei vastannut. Tapahtumat tallentuvat vain selaimeesi.';
+                renderEvents(getLocalEvents());
             }
         }
 
@@ -600,6 +655,13 @@
             document.querySelectorAll('.delete-event-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const id = btn.dataset.id;
+                    if (!apiAvailable) {
+                        const events = getLocalEvents().filter(event => event.id !== id);
+                        saveLocalEvents(events);
+                        eventMessage.textContent = 'Tapahtuma poistettu paikallisesti.';
+                        renderEvents(events);
+                        return;
+                    }
                     try {
                         const res = await fetch(`/api/events/${id}`, {
                             method: 'DELETE',
@@ -612,7 +674,11 @@
                             eventMessage.textContent = 'Virhe poistamisessa.';
                         }
                     } catch (error) {
-                        eventMessage.textContent = 'Virhe: ' + error.message;
+                        apiAvailable = false;
+                        const events = getLocalEvents().filter(event => event.id !== id);
+                        saveLocalEvents(events);
+                        eventMessage.textContent = 'Palvelin ei vastannut. Tapahtuma poistettu paikallisesti.';
+                        renderEvents(events);
                     }
                 });
             });
@@ -637,6 +703,23 @@
                 return;
             }
 
+            if (!apiAvailable) {
+                const events = getLocalEvents();
+                events.push({
+                    id: Date.now().toString(),
+                    member,
+                    date,
+                    title,
+                    description
+                });
+                saveLocalEvents(events);
+                familyForm.reset();
+                document.getElementById('member').value = localStorage.getItem('last-member') || '';
+                eventMessage.textContent = 'Tapahtuma lisätty paikallisesti.';
+                renderEvents(events);
+                return;
+            }
+
             try {
                 const res = await fetch('/api/events', {
                     method: 'POST',
@@ -653,10 +736,36 @@
                     eventMessage.textContent = 'Tapahtuma lisätty!';
                     loadEvents();
                 } else {
-                    eventMessage.textContent = data.error;
+                    apiAvailable = false;
+                    eventMessage.textContent = data.error || 'Palvelin ei vastannut oikein. Tapahtumat tallentuvat paikallisesti.';
+                    familyForm.reset();
+                    document.getElementById('member').value = localStorage.getItem('last-member') || '';
+                    const events = getLocalEvents();
+                    events.push({
+                        id: Date.now().toString(),
+                        member,
+                        date,
+                        title,
+                        description
+                    });
+                    saveLocalEvents(events);
+                    renderEvents(events);
                 }
             } catch (error) {
-                eventMessage.textContent = 'Virhe tapahtuman lisäämisessä: ' + error.message;
+                apiAvailable = false;
+                const events = getLocalEvents();
+                events.push({
+                    id: Date.now().toString(),
+                    member,
+                    date,
+                    title,
+                    description
+                });
+                saveLocalEvents(events);
+                familyForm.reset();
+                document.getElementById('member').value = localStorage.getItem('last-member') || '';
+                eventMessage.textContent = 'Palvelin ei vastannut. Tapahtuma tallennettiin selaimeesi.';
+                renderEvents(events);
             }
         });
 
